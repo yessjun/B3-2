@@ -7,8 +7,8 @@ Git의 status와 diff를 수집해 커밋 메시지와 PR 초안을 생성하는
 Python 3.10 이상에서 표준 라이브러리만 사용합니다. Git 저장소 루트에서 실행합니다.
 
 ```bash
-export AI_BASE_URL=https://llm.pcl.kr/v1
-export AI_MODEL=pickle-general
+export AI_BASE_URL=https://copa.codyssey.kr/v1
+export AI_MODEL=gemini-3.1-flash-lite
 export AI_API_KEY='발급받은 키'
 python3 main.py commit --safe-mode
 python3 main.py pr --safe-mode
@@ -36,7 +36,7 @@ requested_model=pickle-general
 available=True
 ```
 
-지정 모델을 반환하는 models 엔드포인트에 인증한 결과입니다. 생성 요청은 /chat/completions로 전송합니다.
+2026-10-01에 지정 모델을 반환하는 models 엔드포인트에 인증한 결과입니다. 생성 요청은 /chat/completions로 전송합니다.
 
 ## 변경 수집과 오류 처리 검증
 
@@ -227,7 +227,7 @@ exit=1
 
 ```bash
 python3 main.py commit --help
-python3 main.py pr --safe-mode --model pickle-general --temperature 0.2 --max-tokens 1200
+python3 main.py pr --safe-mode --model gemini-3.1-flash-lite --temperature 0.2 --max-tokens 1200
 python3 main.py commit --safe-mode --max-files 5 --max-lines 100 --context '변경 배경'
 ```
 
@@ -235,8 +235,8 @@ Git 저장소마다 루트에서 실행해야 합니다. 도구 파일이 다른
 
 | 옵션 | 기본값 | 용도 |
 |---|---|---|
-| --base-url | AI_BASE_URL 또는 https://llm.pcl.kr/v1 | OpenAI 호환 API 주소 |
-| --model | AI_MODEL 또는 pickle-general | 요청 모델 |
+| --base-url | AI_BASE_URL 또는 https://copa.codyssey.kr/v1 | OpenAI 호환 API 주소 |
+| --model | AI_MODEL 또는 gemini-3.1-flash-lite | 요청 모델 |
 | --temperature | 0.2 | 0~2의 샘플링 설정 |
 | --max-tokens | 1200 | 최대 출력 토큰 |
 | --timeout | 60 | 요청별 대기 초 |
@@ -259,7 +259,7 @@ drafts.py는 용도별 JSON 스키마와 상태/diff, 추가 배경으로 프롬
 
 제목은 한 줄로 정리하고 커밋 72자, PR 80자를 넘으면 후처리로 제한합니다. 커밋 제목 50자는 권장값으로 넘으면 안내합니다. 빈 필드나 잘린 JSON, 누락 섹션은 임의 문장으로 채우지 않고 한 번 재생성합니다. 정상 입력은 요청 1회, 형식 재생성은 최대 2회입니다. 네트워크와 인증 실패는 재시도하지 않습니다.
 
-temperature를 낮추면 표현의 변동을 줄이는 방향이고 높이면 더 다양한 표현을 선택할 수 있습니다. max_tokens는 출력 상한이며 토큰과 글자 수는 다릅니다. 파라미터를 CLI로 받아 같은 diff에서 조건을 바꿔 비교할 수 있습니다. 이 서버에서는 max_tokens=64와 600의 종료/생성 차이를 확인했습니다. 요청 형식과 파라미터 의미는 [OpenAI Chat Completions 문서](https://developers.openai.com/api/reference/cli/resources/chat/subresources/completions/methods/create)를 참고했습니다.
+temperature를 낮추면 표현의 변동을 줄이는 방향이고 높이면 더 다양한 표현을 선택할 수 있습니다. max_tokens는 출력 상한이며 토큰과 글자 수는 다릅니다. 파라미터를 CLI로 받아 같은 diff에서 조건을 바꿔 비교할 수 있습니다. 2026-10-01에는 Pickle 연결에서 max_tokens=64와 600의 종료/생성 차이를 확인했습니다. 요청 형식과 파라미터 의미는 [OpenAI Chat Completions 문서](https://developers.openai.com/api/reference/cli/resources/chat/subresources/completions/methods/create)를 참고했습니다.
 
 초안에는 변경 배경이나 실행할 검사를 추정한 문장이 포함될 수 있습니다. 실제로 수행하지 않은 검사가 성공했다는 표현, 빠진 변경, 환경에 맞지 않는 명령을 확인해야 합니다. 이 예제에서도 python 명령을 python3로 수정했습니다. 실제 팀에 적용한다면 전송 경로 허용 목록과 프로젝트별 ignore/검사 명령을 먼저 설정해 입력 범위와 테스트 제안을 일치시키겠습니다.
 
@@ -512,3 +512,101 @@ OK
 ```
 
 최종 PR에는 기존 8개, 가입/검색 3개, 비ASCII CSRF 1개를 합한 HTTP 검사 12개 통과와 PBKDF2 함수 검증 범위를 명시했습니다. 생성 시점은 e80c238의 13개 파일이며, 추가 검토 수정까지 반영한 최종 PR은 14개 파일입니다.
+
+## 2026-10-16 API 연결과 생성 확인
+
+API 주소를 `https://copa.codyssey.kr/v1`, 모델을 `gemini-3.1-flash-lite`로 변경했습니다. 키는 `AI_API_KEY` 환경변수로 전달합니다. 앞의 `pickle-general` 출력은 변경 전 실행 기록입니다.
+
+### 커밋 메시지
+
+```bash
+$ /opt/homebrew/opt/python@3.14/bin/python3.14 /Users/yejun/GitHub/Codyssey/B3/B3-2/submission/main.py commit --safe-mode --max-tokens 1200 --timeout 40 --context '빈 목록의 평균 계산에서 0으로 나누는 오류를 방지합니다'
+[INFO] Git status: 1개 파일 변경
+[INFO] 전송 파일: 1, 제외: 0, 마스킹: 0, 생략 행: 0
+[INFO] model=gemini-3.1-flash-lite temperature=0.2 max_tokens=1200
+[INFO] API 요청 횟수: 1
+[INFO] tokens: prompt=320 completion=41
+[DONE] 형식 검증 완료
+--- Commit Message ---
+fix: 빈 목록 입력 시 0으로 나누는 오류 방지
+
+- average.py: 입력값이 비어있을 경우 0을 반환하도록 조건문 추가
+exit=0
+```
+
+### PR 초안, temperature 0.2
+
+```bash
+$ /opt/homebrew/opt/python@3.14/bin/python3.14 /Users/yejun/GitHub/Codyssey/B3/B3-2/submission/main.py pr --safe-mode --max-tokens 1200 --timeout 40 --context '빈 목록의 평균 계산에서 0으로 나누는 오류를 방지합니다'
+[INFO] Git status: 1개 파일 변경
+[INFO] 전송 파일: 1, 제외: 0, 마스킹: 0, 생략 행: 0
+[INFO] model=gemini-3.1-flash-lite temperature=0.2 max_tokens=1200
+[INFO] API 요청 횟수: 1
+[INFO] tokens: prompt=323 completion=163
+[DONE] 형식 검증 완료
+--- PR Title ---
+fix: 빈 목록 입력 시 0으로 나누기 오류 방지
+
+--- PR Body ---
+
+## Why
+- 빈 목록을 인자로 전달할 경우 len(values)가 0이 되어 ZeroDivisionError가 발생하는 문제를 해결하기 위함
+
+## What
+- average.py 내 average 함수에 빈 목록 확인 로직 추가
+- 값이 비어있을 경우 0을 반환하도록 수정
+
+## How to Test
+- python -c 'from average import average; print(average([]))' 명령 실행하여 0이 출력되는지 확인
+- 기존 평균 계산 로직이 정상 작동하는지 단위 테스트 수행
+exit=0
+```
+
+### 같은 변경의 PR 초안, temperature 1.2
+
+```bash
+$ /opt/homebrew/opt/python@3.14/bin/python3.14 /Users/yejun/GitHub/Codyssey/B3/B3-2/submission/main.py pr --safe-mode --max-tokens 1200 --timeout 40 --context '빈 목록의 평균 계산에서 0으로 나누는 오류를 방지합니다' --temperature 1.2
+[INFO] Git status: 1개 파일 변경
+[INFO] 전송 파일: 1, 제외: 0, 마스킹: 0, 생략 행: 0
+[INFO] model=gemini-3.1-flash-lite temperature=1.2 max_tokens=1200
+[INFO] API 요청 횟수: 1
+[INFO] tokens: prompt=323 completion=104
+[DONE] 형식 검증 완료
+--- PR Title ---
+fix: 빈 목록 평균 계산 시 0으로 나누는 오류 방지
+
+--- PR Body ---
+
+## Why
+- 빈 목록을 입력받을 경우 len(values)가 0이 되어 ZeroDivisionError가 발생함
+
+## What
+- average 함수 내부에 빈 리스트 확인 로직을 추가하여 0을 반환하도록 수정
+
+## How to Test
+- 빈 리스트([])를 인자로 전달하여 0이 반환되는지 확인
+- 값이 포함된 리스트를 전달하여 정상적인 평균이 계산되는지 확인
+exit=0
+```
+
+두 PR 생성은 같은 diff와 배경, 모델, max_tokens=1200을 사용하고 temperature만 바꿨습니다.
+
+| 조건 | temperature 0.2 | temperature 1.2 |
+|---|---|---|
+| 출력 토큰 | 163 | 104 |
+| 제목/본문 글자 수 | 334 | 257 |
+| API 요청 수 | 1 | 1 |
+| 종료 코드 | 0 | 0 |
+
+이번 출력은 1.2에서 더 짧았고, 검사 제안도 명령 예시에서 입력별 확인 방법으로 달라졌습니다. 온도를 높이면 항상 길어진다는 뜻은 아닙니다. 한 쌍의 출력만으로 품질 우열을 판단하지 않습니다. 두 출력 모두 제목 한 줄과 필수 세 섹션/불릿 검증을 통과했습니다.
+
+초안의 python 명령은 이 환경의 python3로 바꿔 예제를 확인했습니다.
+
+```bash
+$ python3 -c 'from average import average; print(average([]))'
+0
+exit=0
+$ python3 -c 'from average import average; print(average([1, 2, 3]))'
+2.0
+exit=0
+```

@@ -35,8 +35,8 @@ def parser() -> argparse.ArgumentParser:
     commands = root.add_subparsers(dest='command', required=True)
     for name in ['commit', 'pr']:
         p = commands.add_parser(name)
-        p.add_argument('--base-url', default=os.getenv('AI_BASE_URL', 'https://llm.pcl.kr/v1'))
-        p.add_argument('--model', default=os.getenv('AI_MODEL', 'pickle-general'))
+        p.add_argument('--base-url', default=os.getenv('AI_BASE_URL', 'https://copa.codyssey.kr/v1'))
+        p.add_argument('--model', default=os.getenv('AI_MODEL', 'gemini-3.1-flash-lite'))
         p.add_argument('--temperature', type=temperature, default=0.2)
         p.add_argument('--max-tokens', type=positive, default=1200)
         p.add_argument('--timeout', type=timeout, default=60)

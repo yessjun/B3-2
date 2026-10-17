@@ -144,6 +144,42 @@ class GitTests(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0)
             self.assertNotIn('Traceback', result.stdout + result.stderr)
 
+    def test_safe_preview_masks_input_and_never_calls_api(self):
+        (self.path / '.env').write_text('password="excluded-value"\n')
+        (self.path / 'profile.py').write_text('API_KEY="fake-preview-value"\nCONTACT="test@example.com"\nTOKEN="unit-token"\n')
+        with server([{'text': 'unused'}]) as (url, requests):
+            result = self.cli('commit', '--preview', '--safe-mode', '--base-url', url, '--context', 'test@example.com unit-token')
+        self.assertEqual(result.returncode, 0, result.stdout)
+        self.assertEqual(requests, [])
+        for raw in ['excluded-value', 'fake-preview-value', 'test@example.com', 'unit-token']:
+            self.assertNotIn(raw, result.stdout)
+        for text in ['[제외] .env: 민감 경로', '--- profile.py ---', '[REDACTED]', '[REDACTED EMAIL]', 'safe-mode ON', 'API 요청 횟수: 0']:
+            self.assertIn(text, result.stdout)
+
+    def test_preview_without_key_and_only_excluded_files(self):
+        (self.path / '.env').write_text('password="excluded-value"\n')
+        result = self.cli('pr', '--preview', '--safe-mode', '--base-url', 'not-a-url', key='')
+        self.assertEqual(result.returncode, 0, result.stdout)
+        self.assertIn('[제외] .env: 민감 경로', result.stdout)
+        self.assertIn('전송할 diff가 없습니다', result.stdout)
+        self.assertIn('API 요청 횟수: 0', result.stdout)
+        self.assertNotIn('excluded-value', result.stdout)
+
+    def test_preview_off_shows_current_input_and_safe_limits_apply(self):
+        (self.path / '.env').write_text('DEMO_ONLY="fake-environment"\n')
+        (self.path / 'a.txt').write_text('new\n' * 20)
+        (self.path / 'profile.py').write_text('API_KEY="fake-preview-value"\n')
+        raw = self.cli('commit', '--preview', key='')
+        self.assertEqual(raw.returncode, 0, raw.stdout)
+        self.assertIn('safe-mode OFF', raw.stdout)
+        self.assertIn('fake-environment', raw.stdout)
+        self.assertIn('fake-preview-value', raw.stdout)
+        limited = self.cli('commit', '--preview', '--safe-mode', '--max-files', '1', '--max-lines', '8', key='')
+        self.assertEqual(limited.returncode, 0, limited.stdout)
+        self.assertIn('[제외] profile.py: 파일 수 제한', limited.stdout)
+        self.assertIn('전송 파일: 1, 제외: 2', limited.stdout)
+        self.assertIn('API 요청 횟수: 0', limited.stdout)
+
 
 class PrivacyTests(unittest.TestCase):
     def test_tokens_email_assignments_and_partial_private_key(self):

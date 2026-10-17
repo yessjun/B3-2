@@ -241,6 +241,7 @@ Git 저장소마다 루트에서 실행해야 합니다. 도구 파일이 다른
 | --max-tokens | 1200 | 최대 출력 토큰 |
 | --timeout | 60 | 요청별 대기 초 |
 | --safe-mode | OFF | 경로 제외, 마스킹과 입력 제한 |
+| --preview | OFF | 전처리된 diff/배경과 제외 파일을 출력하고 요청 없이 종료 |
 | --max-files | 10 | 안전 모드의 최대 전송 파일 수 |
 | --max-lines | 200 | 안전 모드의 전체 diff 최대 행 수 |
 | --context | 추가 배경 없음 | 사용자가 알려주는 변경 이유 |
@@ -248,6 +249,15 @@ Git 저장소마다 루트에서 실행해야 합니다. 도구 파일이 다른
 안전 모드는 .env/.env.*, .pem/.key, credentials, credentials.json, .git-credentials, id_rsa/id_ed25519, secrets.json과 .aws/.ssh 안의 경로를 읽기 전에 제외합니다. pickle-/sk-/ghp_/github_pat_ 토큰, AWS Access Key ID, 이메일, 키/비밀번호 할당과 개인키 블록을 마스킹합니다. 이름 변경은 이전 경로도 검사합니다. 마스킹은 행을 제한하기 전에 적용하며, 로그의 마스킹 수는 치환 횟수입니다.
 
 파일 수와 diff 행 수를 제한하면 입력량을 줄일 수 있지만 생략된 변경이 초안에서 빠질 수 있습니다. 바이너리는 Git이 출력한 변경 표시만 전달합니다. 이 정책이 모든 개인정보 형식을 인식하는 것은 아니므로 실제 입력 범위와 결과를 검토해야 합니다.
+
+`--preview`로 API를 호출하기 전에 전송 내용을 확인할 수 있습니다. 키 없이도 실행되며 안전 모드의 적용 여부와 파일/행 제한은 생성 명령과 같습니다. ON에서는 치환된 diff와 제외한 경로/이유를, OFF에서는 마스킹하지 않은 현재 입력을 보여줍니다.
+
+```bash
+python3 main.py commit --safe-mode --preview
+python3 main.py commit --preview
+```
+
+미리보기에는 파일명과 diff, 처리된 context를 표시합니다. 시스템 프롬프트와 HTTP 인증 헤더는 포함하지 않습니다. 실제 생성에는 같은 명령에서 `--preview`를 빼고 실행합니다.
 
 ## 코드 흐름과 형식 검증
 
@@ -610,3 +620,43 @@ $ python3 -c 'from average import average; print(average([1, 2, 3]))'
 2.0
 exit=0
 ```
+
+## 2026-10-17 전송 내용 미리보기
+
+가짜 설정이 있는 평균 함수 예제에서 생성 전 입력을 확인했습니다. 제외한 파일은 경로와 이유만 표시하고, 전송할 파일은 전처리된 diff를 표시합니다.
+
+```text
+$ python3 main.py commit --safe-mode --preview
+[INFO] Git status: 3개 파일 변경
+[INFO] 전송 파일: 2, 제외: 1, 마스킹: 2, 생략 행: 0
+--- 전송 내용 미리보기 (safe-mode ON) ---
+[제외] .env: 민감 경로
+[Context] 추가 배경 없음
+
+--- average.py ---
+diff --git a/average.py b/average.py
+index 3d50b59..811045e 100644
+--- a/average.py
++++ b/average.py
+@@ -1,2 +1,4 @@
+ def average(values):
++    if not values:
++        return 0
+     return sum(values) / len(values)
+
+--- profile.py ---
+diff --git a/profile.py b/profile.py
+new file mode 100644
+index 0000000..7a3a2ea
+--- /dev/null
++++ b/profile.py
+@@ -0,0 +1,2 @@
++API_KEY = "[REDACTED]"
++CONTACT = "[REDACTED EMAIL]"
+[INFO] API 요청 횟수: 0
+exit=0
+```
+
+미리보기는 요청 0회로 종료했습니다. 생성 명령과 같은 전처리를 사용하며 제외한 파일의 내용은 읽지 않습니다.
+
+회귀 검사 20개가 통과했습니다. 추가한 3개 검사는 테스트용 키/이메일과 제외 내용의 비노출, 요청 0회, 키 없이 실행, ON/OFF 입력과 파일/행 제한을 확인합니다.

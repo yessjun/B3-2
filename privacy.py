@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import PurePosixPath
 import re
 from typing import Callable
@@ -41,17 +41,21 @@ class Prepared:
     excluded: int
     redactions: int
     omitted_lines: int
+    excluded_files: list[tuple[str, str]] = field(default_factory=list)
 
 
 def prepare(changes: list[Change], load_diff: Callable[[Change], str], safe: bool, max_files: int, max_lines: int, known_secret: str = '') -> Prepared:
     files = []
+    excluded_files = []
     excluded = redactions = omitted = used_lines = 0
     for change in changes:
         if safe and (sensitive_path(change.path) or change.previous and sensitive_path(change.previous)):
             excluded += 1
+            excluded_files.append((redact(change.path, known_secret)[0], '민감 경로'))
             continue
         if safe and len(files) >= max_files:
             excluded += 1
+            excluded_files.append((redact(change.path, known_secret)[0], '파일 수 제한'))
             continue
         diff = load_diff(change)
         path, previous = change.path, change.previous
@@ -67,4 +71,4 @@ def prepare(changes: list[Change], load_diff: Callable[[Change], str], safe: boo
             used_lines += min(len(lines), available)
         if diff.strip():
             files.append({'status': change.status, 'path': path, 'previous_path': previous, 'diff': diff})
-    return Prepared(files, excluded, redactions, omitted)
+    return Prepared(files, excluded, redactions, omitted, excluded_files)
